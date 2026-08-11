@@ -155,7 +155,7 @@ body {
 .roster-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 10px; }
 
 .lo-card {
-    display: grid; grid-template-columns: 34px 1fr auto; gap: 16px; align-items: center;
+    display: grid; grid-template-columns: 34px 1fr auto 14px; gap: 16px; align-items: center;
     padding: 15px 20px; border-radius: 16px; background: #fff;
     border: 1px solid var(--card-line); box-shadow: var(--sh-sm);
     animation: riseIn .4s var(--ease) both;
@@ -223,6 +223,42 @@ body {
 .foot .admin-link { margin-top: 20px; background: transparent; border: 1px solid rgba(230,242,243,.22); color: rgba(230,242,243,.6); padding: 8px 16px; border-radius: 999px; font-family: var(--f-mono); font-size: 11px; letter-spacing: .06em; cursor: pointer; transition: all .2s; }
 .foot .admin-link:hover { color: #fff; border-color: var(--amber); background: rgba(255,172,39,.12); }
 
+/* ===== Clickable row + chevron affordance ===== */
+.lo-card { cursor: pointer; transition: transform .15s var(--ease), box-shadow .15s var(--ease), border-color .15s var(--ease); }
+.lo-card:hover { transform: translateY(-1px); box-shadow: var(--sh-md); border-color: var(--card-line-2); }
+.lo-card:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.lo-chev { align-self: center; justify-self: center; color: var(--sand-300); font-family: var(--f-ui); font-size: 19px; line-height: 1; transition: color .15s, transform .15s; }
+.lo-card:hover .lo-chev { color: var(--brand); transform: translateX(2px); }
+
+/* ===== LO detail overlay (month-by-month) ===== */
+.detail-overlay { position: fixed; inset: 0; z-index: 200; display: none; align-items: center; justify-content: center; padding: 20px; background: rgba(36,31,29,.42); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+.detail-overlay.open { display: flex; }
+.detail-panel { position: relative; width: 100%; max-width: 620px; max-height: 88vh; overflow-y: auto; background: #fff; border-radius: 24px; box-shadow: var(--sh-lg); padding: clamp(26px,4vw,40px); animation: riseIn .32s var(--ease) both; }
+.detail-close { position: absolute; top: 16px; right: 16px; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--sand-200); background: #fff; color: var(--sand-600); font-size: 19px; line-height: 1; cursor: pointer; transition: all .15s; }
+.detail-close:hover { border-color: var(--brand); color: var(--brand); }
+.detail-eyebrow { font-family: var(--f-mono); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--taupe); }
+.detail-head-row { display: flex; align-items: center; gap: 11px; flex-wrap: wrap; margin: 8px 0 2px; }
+.detail-name { font-family: var(--f-display); font-weight: 500; font-size: clamp(26px,3.4vw,34px); letter-spacing: -.02em; color: var(--ink-strong); }
+.detail-total { display: flex; align-items: baseline; gap: 10px; margin: 18px 0 20px; padding-bottom: 18px; border-bottom: 1px solid var(--card-line); }
+.detail-total .num { font-family: var(--f-display); font-weight: 500; font-size: 42px; line-height: 1; color: var(--brand); }
+.detail-total .lab { font-family: var(--f-ui); font-size: 12px; color: var(--ink-muted); }
+.detail-total .split { margin-left: auto; font-family: var(--f-ui); font-size: 12.5px; color: var(--sand-600); text-align: right; }
+.detail-total .split b.full { color: var(--brand); } .detail-total .split b.red { color: var(--amber-deep); }
+.dm-head, .dm-row { display: grid; grid-template-columns: 1fr 78px 78px 60px; gap: 10px; align-items: center; }
+.dm-head { font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--taupe); padding: 0 4px 6px; }
+.dm-head span:not(:first-child) { text-align: right; }
+.dm-row { padding: 13px 4px; border-top: 1px solid var(--card-line); }
+.dm-row .mo { font-family: var(--f-ui); font-weight: 600; font-size: 14px; color: var(--ink-body); }
+.dm-row .v { text-align: right; font-family: var(--f-display); font-weight: 500; font-size: 19px; }
+.dm-row .v.full { color: var(--brand); } .dm-row .v.red { color: var(--amber-deep); } .dm-row .v.pts { color: var(--ink-strong); }
+.dm-row .v.zero { color: var(--sand-300); }
+.detail-note { margin-top: 18px; font-family: var(--f-display); font-style: italic; font-size: 12.5px; color: var(--taupe); }
+.detail-empty { padding: 34px 0 10px; text-align: center; font-family: var(--f-display); font-style: italic; color: var(--sand-400); }
+@media (max-width: 560px) {
+    .dm-head, .dm-row { grid-template-columns: 1fr 56px 56px 50px; gap: 6px; }
+    .dm-row .v { font-size: 16px; }
+}
+
 @keyframes riseIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 
 /* ========== Public mobile ========== */
@@ -231,7 +267,7 @@ body {
     .qualify-grid { flex-direction: column; }
     .find-your-card { margin-left: 0; width: 100%; }
     .find-your-card select { flex: 1; max-width: none; }
-    .lo-card { grid-template-columns: 28px 1fr auto; gap: 12px; padding: 13px 16px; }
+    .lo-card { grid-template-columns: 28px 1fr auto 12px; gap: 12px; padding: 13px 16px; }
     .lo-points-num { font-size: 24px; }
     .countdown-row { max-width: 100%; }
 }
@@ -574,6 +610,14 @@ body {
     </div>
 </footer>
 
+<!-- LO detail: month-by-month comp breakdown (click-through from a row) -->
+<div class="detail-overlay" id="loDetailOverlay" role="dialog" aria-modal="true" aria-labelledby="loDetailName">
+    <div class="detail-panel" id="loDetailPanel">
+        <button class="detail-close" id="loDetailClose" aria-label="Close">&times;</button>
+        <div id="loDetailBody"></div>
+    </div>
+</div>
+
 <!-- Admin overlay: PIN gate + full ingest console -->
 <div class="overlay" id="adminOverlay">
     <!-- PIN gate (shown first) -->
@@ -884,17 +928,18 @@ function classify(p) {
     return Object.assign({}, p, { raw, projected, tier, cusp });
 }
 
+function tierMeta(p) {
+    if (p.tier === 'plat') return { cls: 'plat', label: 'Platinum' };
+    if (p.tier === 'gold') return { cls: 'gold', label: 'Gold' };
+    if (p.cusp === 'plat') return { cls: 'cusp-plat', label: 'Platinum Cusp' };
+    if (p.cusp === 'gold') return { cls: 'cusp-gold', label: 'Gold Cusp' };
+    return { cls: 'building', label: 'Climbing' };
+}
+
 function buildCard(p, rank) {
     /* tierClass is the load-bearing state hook: plat | gold | cusp-plat | cusp-gold | building */
-    const tierClass = p.tier === 'plat' ? 'plat'
-                    : p.tier === 'gold' ? 'gold'
-                    : p.cusp === 'plat' ? 'cusp-plat'
-                    : p.cusp === 'gold' ? 'cusp-gold' : 'building';
-    const tierLabel = p.tier === 'plat' ? 'Platinum'
-                    : p.tier === 'gold' ? 'Gold'
-                    : p.cusp === 'plat' ? 'Platinum Cusp'
-                    : p.cusp === 'gold' ? 'Gold Cusp'
-                    : 'Climbing';
+    const tm = tierMeta(p);
+    const tierClass = tm.cls, tierLabel = tm.label;
 
     let paceTxt;
     if (p.tier === 'plat') paceTxt = 'Trip secured · projected ' + Math.round(p.projected);
@@ -920,9 +965,79 @@ function buildCard(p, rank) {
             '<div class="lo-pace">' + paceTxt + '</div>' +
         '</div>' +
         '<div class="lo-points"><div class="lo-points-num ' + tierClass + '">' + p.raw.toFixed(1) + '</div>' +
-        '<div class="lo-points-label">points</div></div>';
+        '<div class="lo-points-label">points</div></div>' +
+        '<div class="lo-chev" aria-hidden="true">&rsaquo;</div>';
+    div.tabIndex = 0;
+    div.setAttribute('role', 'button');
+    div.setAttribute('aria-label', 'View monthly detail for ' + p.lo);
+    div.addEventListener('click', () => openLoDetail(p));
+    div.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLoDetail(p); }
+    });
     return div;
 }
+
+/* ============================================================
+   LO DETAIL — month-by-month full comp vs reduced comp
+   (HELOC and 2nd/3rd liens are already excluded at ingest)
+   ============================================================ */
+const MONTH_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function openLoDetail(p) {
+    const tm = tierMeta(p);
+    const mb = p.monthlyBreakdown || {};
+    const keys = Object.keys(mb)
+        .filter(k => ((mb[k].full || 0) + (mb[k].reduced || 0)) > 0)
+        .sort();
+
+    let totFull = 0, totReduced = 0, rows = '';
+    keys.forEach(k => {
+        const m = mb[k];
+        const f = m.full || 0, r = m.reduced || 0;
+        totFull += f; totReduced += r;
+        const pts = f + 0.6 * r;
+        const parts = k.split('-');
+        const label = (MONTH_FULL[(+parts[1]) - 1] || k) + ' ' + parts[0];
+        rows +=
+            '<div class="dm-row">' +
+                '<div class="mo">' + label + '</div>' +
+                '<div class="v full' + (f ? '' : ' zero') + '">' + f + '</div>' +
+                '<div class="v red' + (r ? '' : ' zero') + '">' + r + '</div>' +
+                '<div class="v pts">' + pts.toFixed(1) + '</div>' +
+            '</div>';
+    });
+
+    const total = totFull + 0.6 * totReduced;
+    const body =
+        '<div class="detail-eyebrow">Producer detail &middot; H2 2026</div>' +
+        '<div class="detail-head-row">' +
+            '<span class="detail-name" id="loDetailName">' + p.lo + '</span>' +
+            '<span class="lo-badge ' + tm.cls + '">' + tm.label + '</span>' +
+        '</div>' +
+        '<div class="detail-total">' +
+            '<span class="num">' + total.toFixed(1) + '</span>' +
+            '<span class="lab">weighted points</span>' +
+            '<span class="split"><b class="full">' + totFull + '</b> full comp &middot; <b class="red">' + totReduced + '</b> reduced</span>' +
+        '</div>' +
+        (keys.length
+            ? ('<div class="dm-head"><span>Month</span><span>Full comp</span><span>Reduced</span><span>Points</span></div>' + rows)
+            : '<div class="detail-empty">Month-by-month detail appears after the next P&amp;L upload.</div>') +
+        '<div class="detail-note">Full comp loans score 1.0, reduced comp 0.6. First liens only &middot; HELOCs and 2nd/3rd liens are excluded.</div>';
+
+    document.getElementById('loDetailBody').innerHTML = body;
+    document.getElementById('loDetailOverlay').classList.add('open');
+}
+
+function closeLoDetail() {
+    document.getElementById('loDetailOverlay').classList.remove('open');
+}
+document.getElementById('loDetailClose').addEventListener('click', closeLoDetail);
+document.getElementById('loDetailOverlay').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeLoDetail();
+});
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('loDetailOverlay').classList.contains('open')) closeLoDetail();
+});
 
 function renderStandings() {
     if (!PRODUCERS.length) return;
@@ -1311,6 +1426,12 @@ function extractSheetLoans(rows, monthIdx) {
     const loC = hdr.indexOf('loan officer');
     const amtC = hdr.findIndex(c => c.indexOf('amount') !== -1);
     const typeC = hdr.findIndex(c => c.indexOf('type') !== -1);
+    /* bps column: prefer a header naming it, else the column right after Amount
+       (holds true across both tracker layouts). Used for the full-comp override. */
+    const bpsC = (() => {
+        const i = hdr.findIndex(c => c.indexOf('bps') !== -1);
+        return i !== -1 ? i : (amtC !== -1 ? amtC + 1 : -1);
+    })();
     const loans = [];
     let section = 'full';
     for (let r = hIdx + 1; r < rows.length; r++) {
@@ -1331,14 +1452,24 @@ function extractSheetLoans(rows, monthIdx) {
             lo: normName(loRaw),
             section,
             amount: numVal(amt),
+            bps: bpsC !== -1 && bpsC < row.length ? numVal(row[bpsC]) : null,
             ptype: typeC !== -1 && typeC < row.length ? String(row[typeC] || '') : ''
         });
     }
     return loans;
 }
 function resolveTeamSecond(team, fullNameIndex) {
-    const parts = team.split(/[\/&]/).map(p => normName(p)).filter(Boolean);
+    let parts = team.split(/[\/&]/).map(p => normName(p)).filter(Boolean);
     if (!parts.length) return team;
+    /* Leif Potter is a transition/reverse support partner: he never owns a PAIRED loan.
+       Solo Potter is credited to him (handled upstream: solo names aren't team loans).
+       When he appears with any other LO, drop him and credit the other owner. */
+    const isPotter = s => s.trim().toLowerCase() === 'leif potter';
+    if (parts.length > 1 && parts.some(isPotter)) {
+        const others = parts.filter(p => !isPotter(p));
+        if (others.length) parts = others;
+    }
+    /* Standard rule for everyone else: the second name listed is the owner. */
     const second = parts.length > 1 ? parts[1] : parts[0];
     if (second.indexOf(' ') !== -1) return second;
     const key = second.toLowerCase();
@@ -1400,12 +1531,16 @@ async function parsePLWorkbook(file, opts) {
         if (!producers[credit]) {
             producers[credit] = { lo: credit, fullCount: 0, reducedCount: 0, volume: 0, months: {} };
         }
-        if (L.section === 'full') producers[credit].fullCount += 1;
+        /* Full-comp override: a loan booked in the Borrower Paid (reduced) section but
+           priced over 275 bps was paid at full split, so it scores as full comp.
+           Common case: reverse loans parked in the bottom section because they clear margin. */
+        const isFull = L.section === 'full' || ((L.bps != null) && L.bps > 275);
+        if (isFull) producers[credit].fullCount += 1;
         else producers[credit].reducedCount += 1;
         producers[credit].volume += L.amount;
         const mkey = year + '-' + String(L.month + 1).padStart(2, '0');
         if (!producers[credit].months[mkey]) producers[credit].months[mkey] = { full: 0, reduced: 0 };
-        if (L.section === 'full') producers[credit].months[mkey].full += 1;
+        if (isFull) producers[credit].months[mkey].full += 1;
         else producers[credit].months[mkey].reduced += 1;
     });
     logAdmin('Filtered: ' + skipHeloc + ' HELOC/2nd, ' + skipNonLO + ' non-LO, ' + skipSmall + ' <$25K', 'l-info');
