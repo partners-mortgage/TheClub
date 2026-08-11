@@ -669,6 +669,17 @@ body {
                 </div>
                 <div class="admin-options">
                     <label class="opt"><input type="checkbox" id="optH2Only" checked> <span>Filter to H2 months only (Jul&ndash;Dec 2026)</span></label>
+                    <label class="opt" style="align-items:center;"><span>Count loans through</span>
+                        <select id="ingestThroughMonth" style="margin-left:8px; background:var(--b3); color:var(--ink); border:1px solid var(--line-2); border-radius:8px; padding:5px 10px; font-family:var(--f-mono, 'JetBrains Mono',monospace); font-size:12px;">
+                            <option value="6">July 2026</option>
+                            <option value="7">August 2026</option>
+                            <option value="8">September 2026</option>
+                            <option value="9">October 2026</option>
+                            <option value="10">November 2026</option>
+                            <option value="11">December 2026</option>
+                        </select>
+                        <span style="margin-left:8px; color:var(--ink-3); font-size:11px;">cumulative from Jul 1</span>
+                    </label>
                     <label class="opt"><input type="checkbox" id="optAiAssist"> <span>Use AI assist for column mapping if needed</span></label>
                 </div>
             </div>
@@ -1244,6 +1255,7 @@ const LS_API_KEY = 'clubH2_apiKey';
 const LS_API_MODEL = 'clubH2_apiModel';
 
 let EXTRACTED = null;  /* {producers: [...], monthsSeen: [...], unmatched: [...]} */
+let LAST_INGEST_FILE = null;  /* cached upload so the month picker can re-extract without re-dropping */
 
 function logAdmin(msg, cls) {
     const el = $('adminLog');
@@ -1345,6 +1357,19 @@ dz.addEventListener('drop', e => {
     if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
 });
 fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
+
+/* Month picker + H2 toggle: re-extract the cached file so the preview reflects the choice */
+(function () {
+    const reextract = () => { if (LAST_INGEST_FILE) handleFile(); };
+    $('ingestThroughMonth').addEventListener('change', reextract);
+    $('optH2Only').addEventListener('change', reextract);
+    /* Default the "count through" month to the current month, clamped to the H2 window */
+    const now = new Date();
+    let dflt = 11;
+    if (now.getFullYear() < 2026) dflt = 6;
+    else if (now.getFullYear() === 2026) dflt = Math.min(11, Math.max(6, now.getMonth()));
+    $('ingestThroughMonth').value = String(dflt);
+})();
 
 /* ============================================================
    SHEETJS LOADER (lazy)
@@ -1462,9 +1487,9 @@ function resolveTeamSecond(team, fullNameIndex) {
     let parts = team.split(/[\/&]/).map(p => normName(p)).filter(Boolean);
     if (!parts.length) return team;
     /* Leif Potter is a transition/reverse support partner: he never owns a PAIRED loan.
-       Solo Potter is credited to him (handled upstream: solo names aren't team loans).
-       When he appears with any other LO, drop him and credit the other owner. */
-    const isPotter = s => s.trim().toLowerCase() === 'leif potter';
+       The tracker sometimes writes just "Potter" as shorthand for him in the LO field
+       (Erin Potter only ever appears as a processor, never as an LO), so match both. */
+    const isPotter = s => { const t = s.trim().toLowerCase(); return t === 'leif potter' || t === 'potter'; };
     if (parts.length > 1 && parts.some(isPotter)) {
         const others = parts.filter(p => !isPotter(p));
         if (others.length) parts = others;
@@ -1484,15 +1509,19 @@ async function parsePLWorkbook(file, opts) {
     const sheetNames = wb.SheetNames;
     logAdmin('Workbook loaded: ' + sheetNames.length + ' sheets', 'l-info');
 
-    /* Pick sheets to process. If opts.h2Only, restrict to Jul-Dec 2026. */
+    /* Pick sheets to process. Cumulative from the window start through opts.throughMonth. */
     const year = 2026;
-    const monthRange = opts.h2Only ? [6, 7, 8, 9, 10, 11] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+    const startM = opts.h2Only ? 6 : 0;
+    const through = (opts.throughMonth != null) ? opts.throughMonth : 11;
+    const monthRange = [];
+    for (let mi = startM; mi <= through; mi++) monthRange.push(mi);
     const chosen = [];
     for (const mi of monthRange) {
         const s = pickMonthSheet(sheetNames, mi, year);
         if (s) chosen.push({ month: mi, sheet: s });
     }
     if (!chosen.length) { throw new Error('No matching monthly sheets found in the workbook.'); }
+    logAdmin('Counting through ' + MONTH_FULL[through] + ' ' + year + ' (cumulative from ' + MONTH_FULL[startM] + ')', 'l-info');
     logAdmin('Sheets picked: ' + chosen.map(c => c.sheet).join(', '), 'l-info');
 
     /* Extract loans from each sheet */
@@ -1524,7 +1553,9 @@ async function parsePLWorkbook(file, opts) {
     let skipHeloc = 0, skipNonLO = 0, skipSmall = 0;
     allLoans.forEach(L => {
         const isTeam = L.lo.indexOf('/') !== -1 || L.lo.indexOf('&') !== -1;
-        const credit = isTeam ? resolveTeamSecond(L.lo, fullNameIndex) : L.lo;
+        let credit = isTeam ? resolveTeamSecond(L.lo, fullNameIndex) : L.lo;
+        /* Solo "Potter" shorthand in the LO field means Leif Potter. */
+        if (normName(credit).toLowerCase() === 'potter') credit = 'Leif Potter';
         if (excludeProduct(L.ptype)) { skipHeloc++; return; }
         if (isNonLO(credit)) { skipNonLO++; return; }
         if (L.amount < 25000) { skipSmall++; return; }
@@ -1549,16 +1580,21 @@ async function parsePLWorkbook(file, opts) {
     return {
         producers: list,
         monthsSeen: chosen.map(c => c.sheet),
+        throughMonth: through,
         totalLoans: allLoans.length - skipHeloc - skipNonLO - skipSmall
     };
 }
 
 async function handleFile(file) {
+    if (file) LAST_INGEST_FILE = file;
+    file = file || LAST_INGEST_FILE;
+    if (!file) return;
     logAdmin('Reading ' + file.name + ' (' + Math.round(file.size / 1024) + ' KB)...', 'l-info');
     try {
         const opts = {
             h2Only: $('optH2Only').checked,
-            aiAssist: $('optAiAssist').checked
+            aiAssist: $('optAiAssist').checked,
+            throughMonth: parseInt($('ingestThroughMonth').value, 10)
         };
         const result = await parsePLWorkbook(file, opts);
 
@@ -1595,7 +1631,9 @@ function renderPreview(result) {
         '<div class="pstat"><div class="n gold">' + goldCount + '</div><div class="l">Gold</div></div>' +
         '<div class="pstat"><div class="n' + (result.unmatched.length ? ' warn' : '') + '">' + result.unmatched.length + '</div><div class="l">Unmatched</div></div>';
 
-    let html = '<div class="plrow head"><span>Loan Officer</span><span class="col-num">LP</span><span class="col-num">BP</span><span class="col-pts">Points</span></div>';
+    const asOf = (result.throughMonth != null) ? (MONTH_FULL[result.throughMonth] + ' 2026') : 'H2 2026';
+    let html = '<div class="admin-hint" style="margin:0 0 10px;">Standings as of <b style="color:var(--teal-1);">' + asOf + '</b> &middot; cumulative from July 1 &middot; ' + result.monthsSeen.length + ' month(s) counted</div>';
+    html += '<div class="plrow head"><span>Loan Officer</span><span class="col-num">LP</span><span class="col-num">BP</span><span class="col-pts">Points</span></div>';
     result.producers.slice(0, 60).forEach(p => {
         const pts = p.fullCount + 0.6 * p.reducedCount;
         const unmatchedTag = p.rosterMatch ? '' : ' <span class="unmatched">no match</span>';
@@ -1650,7 +1688,8 @@ $('confirmWrite').addEventListener('click', async () => {
             rosterMatched: !!p.rosterMatch
         };
     });
-    const yyyymm = new Date().toISOString().slice(0, 7);
+    const tm = (EXTRACTED.throughMonth != null) ? EXTRACTED.throughMonth : new Date().getMonth();
+    const yyyymm = '2026-' + String(tm + 1).padStart(2, '0');
     const snapshot = {
         uploadedBy: 'admin',
         uploadedAt: now,
