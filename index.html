@@ -481,14 +481,14 @@ body {
         <!-- Live stat strip -->
         <div class="tally-row">
             <div class="tally plat">
-                <span class="tally-tag">At altitude</span>
+                <span class="tally-tag">Qualified</span>
                 <span class="tally-num" id="platCount">&mdash;</span>
-                <span class="tally-names" id="platNames"><span class="muted">Opens with first funded loan</span></span>
+                <span class="tally-names" id="platNames"><span class="muted">Raw points crossed the line</span></span>
             </div>
             <div class="tally gold">
-                <span class="tally-tag">Gold on track</span>
+                <span class="tally-tag">On pace</span>
                 <span class="tally-num" id="goldCount">&mdash;</span>
-                <span class="tally-names" id="goldNames"><span class="muted">Opens with first funded loan</span></span>
+                <span class="tally-names" id="goldNames"><span class="muted">Projected to qualify at Dec 31</span></span>
             </div>
             <div class="tally days">
                 <span class="tally-tag">Days of runway</span>
@@ -503,6 +503,7 @@ body {
                 <span class="filter-label">Filter</span>
                 <button class="pill active" data-filter="all">All</button>
                 <button class="pill" data-filter="qualified">Qualified</button>
+                <button class="pill" data-filter="pace">On pace</button>
                 <button class="pill" data-filter="cusp">On the cusp</button>
                 <button class="pill" data-filter="building">Building</button>
                 <div class="find-your-card">
@@ -511,9 +512,17 @@ body {
                 </div>
             </div>
 
-            <div class="group" data-group="qualified">
+            <div class="group" data-group="qualified" id="qualifiedGroup" style="display:none;">
                 <div class="group-head">
                     <h3 class="group-title">Currently <em>qualified</em></h3>
+                    <p class="group-sub" id="qualifiedSub">&mdash;</p>
+                </div>
+                <div class="lo-grid" id="qualifiedGrid"></div>
+            </div>
+
+            <div class="group" data-group="pace">
+                <div class="group-head">
+                    <h3 class="group-title">On <em>pace</em></h3>
                     <p class="group-sub" id="qualSub">&mdash;</p>
                 </div>
                 <div class="lo-grid" id="qualGrid"></div>
@@ -931,20 +940,25 @@ function classify(p) {
     const totalDays = Math.floor((new Date(CONFIG.programEnd) - new Date(CONFIG.programStart)) / 86400000);
     const raw = (p.fullPts || 0) + 0.6 * (p.reducedPts || 0);
     const projected = raw * (totalDays / daysIn);
+    /* qualified = raw points have actually crossed the threshold (locked in).
+       tier/cusp = projection at current pace (motivational trajectory, not earned yet). */
+    const qualified = raw >= CONFIG.platThreshold ? 'plat' : (raw >= CONFIG.goldThreshold ? 'gold' : null);
     let tier = 'none', cusp = null;
     if (projected >= CONFIG.platThreshold) tier = 'plat';
     else if (projected >= CONFIG.goldThreshold) tier = 'gold';
     if (tier === 'gold' && (CONFIG.platThreshold - projected) <= CONFIG.cuspBuffer) cusp = 'plat';
     else if (tier === 'none' && (CONFIG.goldThreshold - projected) <= CONFIG.cuspBuffer) cusp = 'gold';
-    return Object.assign({}, p, { raw, projected, tier, cusp });
+    return Object.assign({}, p, { raw, projected, qualified, tier, cusp });
 }
 
 function tierMeta(p) {
-    if (p.tier === 'plat') return { cls: 'plat', label: 'Platinum' };
-    if (p.tier === 'gold') return { cls: 'gold', label: 'Gold' };
-    if (p.cusp === 'plat') return { cls: 'cusp-plat', label: 'Platinum Cusp' };
-    if (p.cusp === 'gold') return { cls: 'cusp-gold', label: 'Gold Cusp' };
-    return { cls: 'building', label: 'Climbing' };
+    if (p.qualified === 'plat') return { cls: 'plat', label: 'Platinum', state: 'qualified' };
+    if (p.qualified === 'gold') return { cls: 'gold', label: 'Gold', state: 'qualified' };
+    if (p.tier === 'plat') return { cls: 'plat', label: 'Plat pace', state: 'pace' };
+    if (p.tier === 'gold') return { cls: 'gold', label: 'Gold pace', state: 'pace' };
+    if (p.cusp === 'plat') return { cls: 'cusp-plat', label: 'Platinum cusp', state: 'cusp' };
+    if (p.cusp === 'gold') return { cls: 'cusp-gold', label: 'Gold cusp', state: 'cusp' };
+    return { cls: 'building', label: 'Climbing', state: 'building' };
 }
 
 function buildCard(p, rank) {
@@ -953,10 +967,19 @@ function buildCard(p, rank) {
     const tierClass = tm.cls, tierLabel = tm.label;
 
     let paceTxt;
-    if (p.tier === 'plat') paceTxt = 'Trip secured · projected ' + Math.round(p.projected);
-    else if (p.tier === 'gold') paceTxt = 'Projected ' + p.projected.toFixed(1) + ' · ' + (CONFIG.platThreshold - p.projected).toFixed(1) + ' to Platinum';
-    else if (p.cusp === 'gold') paceTxt = (CONFIG.goldThreshold - p.projected).toFixed(1) + ' points to Gold';
-    else paceTxt = 'Projected ' + p.projected.toFixed(1) + ' · Q4 is the climb';
+    if (tm.state === 'qualified') {
+        paceTxt = (p.qualified === 'plat')
+            ? 'Qualified · Platinum locked in'
+            : 'Qualified · Gold locked in · ' + Math.max(0, (CONFIG.platThreshold - p.raw)).toFixed(1) + ' raw to Platinum';
+    } else if (p.tier === 'plat') {
+        paceTxt = 'On pace for Platinum · projected ' + Math.round(p.projected);
+    } else if (p.tier === 'gold') {
+        paceTxt = 'On pace for Gold · projected ' + p.projected.toFixed(1) + ' · ' + (CONFIG.platThreshold - p.projected).toFixed(1) + ' to Platinum';
+    } else if (p.cusp === 'gold') {
+        paceTxt = (CONFIG.goldThreshold - p.projected).toFixed(1) + ' projected to Gold';
+    } else {
+        paceTxt = 'Projected ' + p.projected.toFixed(1) + ' · Q4 is the climb';
+    }
 
     const barMax = CONFIG.platThreshold * 1.15;
     const fillPct = Math.min(100, (p.raw / barMax) * 100);
@@ -1053,28 +1076,36 @@ document.addEventListener('keydown', e => {
 function renderStandings() {
     if (!PRODUCERS.length) return;
     const scored = PRODUCERS.map(classify).sort((a, b) => b.projected - a.projected);
-    const platTier = scored.filter(p => p.tier === 'plat');
-    const goldTier = scored.filter(p => p.tier === 'gold');
-    const platCusp = scored.filter(p => p.cusp === 'plat');
-    const goldCusp = scored.filter(p => p.cusp === 'gold');
-    const building = scored.filter(p => p.tier === 'none' && !p.cusp);
+    const qualifiedList = scored.filter(p => p.qualified).sort((a, b) => b.raw - a.raw);
+    const onPace = scored.filter(p => !p.qualified && (p.tier === 'plat' || p.tier === 'gold'));
+    const platCusp = scored.filter(p => !p.qualified && p.cusp === 'plat');
+    const goldCusp = scored.filter(p => !p.qualified && p.cusp === 'gold');
+    const building = scored.filter(p => !p.qualified && p.tier === 'none' && !p.cusp);
 
-    $('platCount').textContent = platTier.length;
-    $('platNames').textContent = platTier.length ? platTier.map(p => p.lo.split(' ')[0]).join(' · ') : 'No qualifiers yet';
-    $('goldCount').textContent = goldTier.length;
-    $('goldNames').textContent = goldTier.length ? goldTier.map(p => p.lo.split(' ')[0]).join(' · ') : 'No qualifiers yet';
+    const first = p => p.lo.split(' ')[0];
+    /* Tally 1 = actually qualified (raw crossed). Tally 2 = on pace (projected). */
+    $('platCount').textContent = qualifiedList.length;
+    $('platNames').textContent = qualifiedList.length ? qualifiedList.map(first).join(' · ') : 'None across the line yet';
+    $('goldCount').textContent = onPace.length;
+    $('goldNames').textContent = onPace.length ? onPace.map(first).join(' · ') : 'No one on pace yet';
 
-    const qualCount = platTier.length + goldTier.length;
-    $('qualSub').textContent = qualCount + ' producer' + (qualCount === 1 ? '' : 's') + ' on track';
-    $('platCuspSub').textContent = platCusp.length + ' within ' + CONFIG.cuspBuffer + ' of Platinum';
-    $('goldCuspSub').textContent = goldCusp.length + ' within ' + CONFIG.cuspBuffer + ' of Gold';
+    $('qualifiedSub').textContent = qualifiedList.length + ' locked in';
+    $('qualSub').textContent = onPace.length + (onPace.length === 1 ? ' producer' : ' producers') + ' projected to qualify at current pace';
+    $('platCuspSub').textContent = platCusp.length + ' within ' + CONFIG.cuspBuffer + ' of Platinum (projected)';
+    $('goldCuspSub').textContent = goldCusp.length + ' within ' + CONFIG.cuspBuffer + ' of Gold (projected)';
 
-    const qualGrid = $('qualGrid'), platCG = $('platCuspGrid'), goldCG = $('goldCuspGrid'), buildG = $('buildGrid');
-    qualGrid.innerHTML = ''; platCG.innerHTML = ''; goldCG.innerHTML = ''; buildG.innerHTML = '';
-    [...platTier, ...goldTier].forEach((p, i) => qualGrid.appendChild(buildCard(p, i + 1)));
-    platCusp.forEach(p => platCG.appendChild(buildCard(p, scored.indexOf(p) + 1)));
-    goldCusp.forEach(p => goldCG.appendChild(buildCard(p, scored.indexOf(p) + 1)));
-    building.forEach(p => buildG.appendChild(buildCard(p, scored.indexOf(p) + 1)));
+    /* Single global rank across the displayed order */
+    const order = [...qualifiedList, ...onPace, ...platCusp, ...goldCusp, ...building];
+    const rankOf = new Map(order.map((p, i) => [p, i + 1]));
+
+    const qG = $('qualifiedGrid'), paceG = $('qualGrid'), platCG = $('platCuspGrid'), goldCG = $('goldCuspGrid'), buildG = $('buildGrid');
+    [qG, paceG, platCG, goldCG, buildG].forEach(g => g.innerHTML = '');
+    qualifiedList.forEach(p => qG.appendChild(buildCard(p, rankOf.get(p))));
+    $('qualifiedGroup').style.display = qualifiedList.length ? '' : 'none';
+    onPace.forEach(p => paceG.appendChild(buildCard(p, rankOf.get(p))));
+    platCusp.forEach(p => platCG.appendChild(buildCard(p, rankOf.get(p))));
+    goldCusp.forEach(p => goldCG.appendChild(buildCard(p, rankOf.get(p))));
+    building.forEach(p => buildG.appendChild(buildCard(p, rankOf.get(p))));
 
     /* Populate find-your-card */
     const sel = $('findCard');
@@ -1091,7 +1122,10 @@ function renderStandings() {
 function applyFilter(f) {
     document.querySelectorAll('.pill[data-filter]').forEach(b => b.classList.toggle('active', b.dataset.filter === f));
     document.querySelectorAll('#standingsLive .group[data-group]').forEach(g => {
-        g.style.display = (f === 'all' || g.dataset.group === f) ? '' : 'none';
+        const match = (f === 'all' || g.dataset.group === f);
+        const grid = g.querySelector('.lo-grid');
+        const emptyQualified = (g.id === 'qualifiedGroup') && (!grid || grid.children.length === 0);
+        g.style.display = (match && !emptyQualified) ? '' : 'none';
     });
 }
 document.querySelectorAll('.pill[data-filter]').forEach(btn => {
@@ -1709,6 +1743,9 @@ $('confirmWrite').addEventListener('click', async () => {
         loadSnapshots();
     } catch (err) {
         logAdmin('Write failed: ' + err.message, 'l-err');
+        if (/permission_denied/i.test(err.message || '')) {
+            logAdmin('Fix: Firebase console > project the-club-2ea91 > Realtime Database (instance the-club-2ea91-default-rtdb) > Rules > publish { "rules": { ".read": true, ".write": true } }. The top-level ".write" must be present.', 'l-warn');
+        }
     }
 });
 
